@@ -62,8 +62,17 @@
   <ItemGroup>
     <Compile Include="Interfaces\IInvoiceRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Commands\DeleteInvoiceCommand.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Commands\UpdateInvoiceCommand.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Commands\CreateInvoiceCommand.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Handlers\GetInvoiceByIdHandler.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Handlers\UpdateInvoiceHandler.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Handlers\DeleteInvoiceHandler.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Handlers\CreateInvoiceHandler.cs" />
+    <Compile Include="UseCases\InvoiceCRUD\Queries\GetInvoiceByIdQuery.cs" />
     <Compile Include="UseCases\ProcessPayment\ProcessPaymentHandler.cs" />
     <Compile Include="UseCases\ProcessPayment\ProcessPaymentCommand.cs" />
+    <Compile Include="UseCases\Shared\InvoiceValidation.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RefactorThis.Domain\RefactorThis.Domain.csproj">
@@ -75,5 +84,6 @@
     <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

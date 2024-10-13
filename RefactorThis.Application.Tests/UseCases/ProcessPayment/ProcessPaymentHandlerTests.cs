@@ -3,7 +3,7 @@ using RefactorThis.Application.Interfaces;
 using RefactorThis.Application.UseCases.ProcessPayment;
 using RefactorThis.Domain.Entities;
 
-namespace RefactorThis.Application.Tests
+namespace RefactorThis.Application.Tests.UseCases.ProcessPayment
 {
     [TestFixture]
     public class ProcessPaymentHandlerTests
@@ -28,7 +28,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("Missing payment reference."));
+                Assert.That(result.Messages, Has.One.Contains("Missing payment reference."));
             });
         }
 
@@ -42,7 +42,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("Invalid payment amount."));
+                Assert.That(result.Messages, Has.One.Contains("Invalid payment amount."));
             });
         }
 
@@ -51,14 +51,14 @@ namespace RefactorThis.Application.Tests
         {
             var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 100 };
             _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                                  .ReturnsAsync((Invoice)null);
+                                  .ReturnsAsync(value: null);
 
             var result = await _handler.Handle(command, CancellationToken.None);
 
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("There is no invoice matching this payment"));
+                Assert.That(result.Messages, Has.One.Contains("There is no invoice matching this payment"));
             });
         }
 
@@ -75,7 +75,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("The amount is negative."));
+                Assert.That(result.Messages, Has.One.Contains("The amount is negative."));
             });
         }
 
@@ -92,7 +92,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("The tax amount is negative."));
+                Assert.That(result.Messages, Has.One.Contains("The tax amount is negative."));
             });
         }
 
@@ -105,7 +105,7 @@ namespace RefactorThis.Application.Tests
                 Amount = 0,
                 AmountPaid = 0,
                 TaxAmount = 0,
-                Payments = [ new Payment { Amount = 50 } ]
+                Payments = [new Payment { Amount = 50 }]
             };
             _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                                   .ReturnsAsync(invoice);
@@ -115,7 +115,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("The invoice is in an invalid state, it has an amount of 0 and it has payments."));
+                Assert.That(result.Messages, Has.One.Contains("The invoice is in an invalid state, it has an amount of 0 and it has payments."));
             });
         }
 
@@ -127,7 +127,8 @@ namespace RefactorThis.Application.Tests
             {
                 Amount = 0,
                 AmountPaid = 0,
-                TaxAmount = 0
+                TaxAmount = 0,
+                Payments = []
             };
             _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                                   .ReturnsAsync(invoice);
@@ -137,7 +138,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("No payment needed."));
+                Assert.That(result.Messages, Has.One.Contains("No payment needed."));
             });
         }
 
@@ -160,7 +161,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("The sum of the payments is different from the amount paid."));
+                Assert.That(result.Messages, Has.One.Contains("The sum of the payments is different from the amount paid."));
             });
         }
 
@@ -187,7 +188,7 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("The invoice is already fully paid."));
+                Assert.That(result.Messages, Has.One.Contains("The invoice is already fully paid."));
             });
         }
 
@@ -195,10 +196,16 @@ namespace RefactorThis.Application.Tests
         public async Task Handle_ShouldReturnErrorMessage_WhenOverPaymentOccurs()
         {
             var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 200 };
-            var invoice = new Invoice { Amount = 100, AmountPaid = 50, TaxAmount = 0, Payments =
+            var invoice = new Invoice
+            {
+                Amount = 100,
+                AmountPaid = 50,
+                TaxAmount = 0,
+                Payments =
             [
                 new() { Amount = 50 }
-            ] };
+            ]
+            };
             _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                                   .ReturnsAsync(invoice);
 
@@ -207,15 +214,25 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.False);
-                Assert.That(result.Data, Has.One.Contains("Over payment."));
+                Assert.That(result.Messages, Has.One.Contains("Over payment."));
             });
         }
 
         [Test]
-        public async Task Handle_ShouldReturnPartialPaymentMessage_WhenPartialPaymentIsMade()
+        public async Task Handle_ShouldReturnPartialPaymentMessage_WithTax_WhenPartialPaymentIsMade()
         {
             var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 50 };
-            var invoice = new Invoice { Amount = 100, AmountPaid = 0, TaxAmount = 0, Payments = [] };
+            var invoice = new Invoice
+            {
+                Amount = 200,
+                AmountPaid = 100,
+                TaxAmount = 20,
+                Payments =
+            [
+                new() { Amount = 50 },
+                new() { Amount = 50 }
+            ]
+            };
             _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                                   .ReturnsAsync(invoice);
 
@@ -224,15 +241,26 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.True);
-                Assert.That(result.Data, Has.One.Contains("Invoice is now partially paid."));
+                Assert.That(result.IsSuccess, Is.True);
+                Assert.That(result.Messages, Has.One.Contains("Invoice is now partially paid."));
             });
         }
 
         [Test]
-        public async Task Handle_ShouldReturnFullPaymentMessage_WhenFullPaymentIsMade()
+        public async Task Handle_ShouldReturnPartialPaymentMessage_WithoutTax_WhenPartialPaymentIsMade()
         {
-            var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 100 };
-            var invoice = new Invoice { Amount = 100, AmountPaid = 0, TaxAmount = 0, Payments = [] };
+            var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 50 };
+            var invoice = new Invoice
+            {
+                Amount = 200,
+                AmountPaid = 100,
+                TaxAmount = 0,
+                Payments =
+            [
+                new() { Amount = 50 },
+                new() { Amount = 50 }
+            ]
+            };
             _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                                   .ReturnsAsync(invoice);
 
@@ -241,7 +269,61 @@ namespace RefactorThis.Application.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(result.IsSuccess, Is.True);
-                Assert.That(result.Data, Has.One.Contains("Invoice is now fully paid."));
+                Assert.That(result.IsSuccess, Is.True);
+                Assert.That(result.Messages, Has.One.Contains("Invoice is now partially paid."));
+            });
+        }
+
+        [Test]
+        public async Task Handle_ShouldReturnFullPaymentMessage_WithTax_WhenFullPaymentIsMade()
+        {
+            var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 100 };
+            var invoice = new Invoice
+            {
+                Amount = 200,
+                AmountPaid = 120,
+                TaxAmount = 20,
+                Payments =
+            [
+                new() { Amount = 120 }
+            ]
+            };
+            _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                                  .ReturnsAsync(invoice);
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.IsSuccess, Is.True);
+                Assert.That(result.Messages, Has.One.Contains("Invoice is now fully paid."));
+            });
+        }
+
+
+        [Test]
+        public async Task Handle_ShouldReturnFullPaymentMessage_WithoutTax_WhenFullPaymentIsMade()
+        {
+            var command = new ProcessPaymentCommand { Reference = "INV123", Amount = 100 };
+            var invoice = new Invoice
+            {
+                Amount = 200,
+                AmountPaid = 100,
+                TaxAmount = 0,
+                Payments =
+            [
+                new() { Amount = 100 }
+            ]
+            };
+            _invoiceRepositoryMock.Setup(repo => repo.GetInvoiceByReferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                                  .ReturnsAsync(invoice);
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.IsSuccess, Is.True);
+                Assert.That(result.Messages, Has.One.Contains("Invoice is now fully paid."));
             });
         }
     }
